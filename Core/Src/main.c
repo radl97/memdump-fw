@@ -23,7 +23,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "usbd_cdc.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,6 +47,10 @@ SPI_HandleTypeDef hspi1;
 
 /* USER CODE BEGIN PV */
 
+state st = run;
+uint16_t i2c_address = 0;
+uint32_t limit_address = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -55,7 +59,7 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
-
+extern uint8_t CDC_Transmit_FS(uint8_t *Buf, uint16_t Len);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -96,14 +100,41 @@ int main(void)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
 
+  uint8_t txbuff [1024] = {0};
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-    HAL_Delay(1000);
-    HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+  while (1) {
+
+    switch (st) {
+      case read_i2c:
+        st = run;
+        break;
+      case read_spi:
+        st = run;
+        break;
+      case read_d28:
+        st = run;
+        break;
+      case read_d32:
+        st = run;
+        break;
+      case write_i2c:
+        st = run;
+        break;
+      case write_spi:
+        st = run;
+        break;
+      case write_d28:
+        st = run;
+        break;
+      case write_d32:
+        st = run;
+        break;
+      default:;
+    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

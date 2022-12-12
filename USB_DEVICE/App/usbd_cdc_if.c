@@ -22,7 +22,7 @@
 #include "usbd_cdc_if.h"
 
 /* USER CODE BEGIN INCLUDE */
-
+#include <stdio.h>
 /* USER CODE END INCLUDE */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -31,7 +31,9 @@
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-
+extern state st;
+extern uint16_t i2c_address;
+extern uint32_t limit_address;
 /* USER CODE END PV */
 
 /** @addtogroup STM32_USB_OTG_DEVICE_LIBRARY
@@ -261,6 +263,60 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
   /* USER CODE BEGIN 6 */
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
   USBD_CDC_ReceivePacket(&hUsbDeviceFS);
+  if (st == run) {
+    if (Buf[0] == 'r') {
+      switch (Buf[1]) {
+        case 'i':
+          st = read_i2c;
+          break;
+        case 's':
+          st = read_spi;
+          break;
+        case '2':
+          st = read_d28;
+          break;
+        case '3':
+          st = read_d32;
+          break;
+        default:
+          st = invalid;
+          return (USBD_OK);
+      }
+    }
+    else if (Buf[0] == 'w') {
+      switch (Buf[1]) {
+        case 'i':
+          st = write_i2c;
+          break;
+        case 's':
+          st = write_spi;
+          break;
+        case '2':
+          st = write_d28;
+          break;
+        case '3':
+          st = write_d32;
+          break;
+        default:
+          st = invalid;
+          return (USBD_OK);
+      }
+    }
+    else {
+      st = invalid;
+      return (USBD_OK);
+    }
+    if (sscanf((char *)Buf + 2, "%lx", &limit_address) != 1) {
+      st = invalid;
+      return (USBD_OK);
+    }
+    if (st == read_i2c || st == write_i2c) {
+      if (sscanf((char *)Buf + 2, "%*lx %hx", &i2c_address) != 1) {
+        st = invalid;
+        return (USBD_OK);
+      }
+    }
+  }
   return (USBD_OK);
   /* USER CODE END 6 */
 }

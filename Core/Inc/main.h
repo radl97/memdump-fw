@@ -38,6 +38,11 @@ extern "C" {
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
 
+/* state enum type */
+typedef enum {
+  run, read_spi, read_i2c, read_d28, read_d32, write_spi, write_i2c, write_d28, write_d32, invalid
+} state;
+
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
