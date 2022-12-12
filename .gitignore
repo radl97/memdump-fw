@@ -1,10 +1,10 @@
 cmake-build-debug 
-cmake-build-debug/*
+cmake-build-minsizerel
+cmake-build-release
+cmake-build-relwithdebinfo
 .settings 
-.settings/*
 .cproject
 .mxproject
 .project
 .idea
-.idea/*
 memdump-ft2232.cfg

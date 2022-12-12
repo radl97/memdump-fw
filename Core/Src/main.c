@@ -23,7 +23,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "usbd_cdc.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,7 +48,7 @@ SPI_HandleTypeDef hspi1;
 /* USER CODE BEGIN PV */
 
 state st = run;
-uint16_t i2c_address = 0;
+uint32_t i2c_address = 0;
 uint32_t limit_address = 0;
 
 /* USER CODE END PV */
@@ -66,6 +66,60 @@ extern uint8_t CDC_Transmit_FS(uint8_t *Buf, uint16_t Len);
 /* USER CODE BEGIN 0 */
 
 /* -----------------------------------------------------------------------------
+ * Converts a hexadecimal ASCII character to it's value
+ *
+ * From https://github.com/Sasszem/oldschool-game/blob/main/save.c
+ * under the conditions of the MIT License:
+ *
+ * MIT License
+ *
+ * Copyright (c) 2022 László Baráth
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * -------------------------------------------------------------------------- */
+uint8_t hex_nibble(char val) {
+  if ('0' <= val && val <= '9')
+    return val - '0';
+  if ('a' <= val && val <= 'f')
+    return val - 'a' + 10;
+  if ('A' <= val && val <= 'F')
+    return val - 'A' + 10;
+  return 0xFF;
+}
+
+/* -----------------------------------------------------------------------------------------
+ * Converts all characters until the first character that matches delim or until *Len
+ * Result is stored to dest
+ * Return value is the number of characters processed or 0 in case of a conversion failure
+ * ----------------------------------------------------------------------------------------- */
+uint8_t homegrown_scanf (uint8_t *Buf, const uint32_t *Len, uint32_t *dest, const char delim) {
+  uint8_t cursor = 0;
+  for (*dest = 0; Buf[cursor] != delim || cursor < *Len; cursor++) {
+    uint8_t nibble = hex_nibble(Buf[cursor]);
+    if (nibble == 0xFF) {
+      return(0);
+    }
+    *dest = *dest * 16 + nibble;
+  }
+  return (cursor);
+}
+/* --------------------------------------------------------------------------
  * convert a hex to ascii string
  * input is a byte array (binary), output is a character array (str)
  * len is the number of bytes to convert, str needs to be at least 2x as big

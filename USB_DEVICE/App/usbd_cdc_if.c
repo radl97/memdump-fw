@@ -22,7 +22,7 @@
 #include "usbd_cdc_if.h"
 
 /* USER CODE BEGIN INCLUDE */
-#include <stdio.h>
+
 /* USER CODE END INCLUDE */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -32,7 +32,7 @@
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
 extern state st;
-extern uint16_t i2c_address;
+extern uint32_t i2c_address;
 extern uint32_t limit_address;
 /* USER CODE END PV */
 
@@ -112,6 +112,10 @@ extern USBD_HandleTypeDef hUsbDeviceFS;
 
 /* USER CODE BEGIN EXPORTED_VARIABLES */
 
+extern uint8_t hex_nibble(char val);
+extern uint8_t homegrown_scanf (uint8_t *Buf, const uint32_t *Len, uint32_t *dest, char delim);
+
+
 /* USER CODE END EXPORTED_VARIABLES */
 
 /**
@@ -126,7 +130,7 @@ extern USBD_HandleTypeDef hUsbDeviceFS;
 static int8_t CDC_Init_FS(void);
 static int8_t CDC_DeInit_FS(void);
 static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length);
-static int8_t CDC_Receive_FS(uint8_t* pbuf, uint32_t *Len);
+static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len);
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_DECLARATION */
 
@@ -264,6 +268,7 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
   USBD_CDC_ReceivePacket(&hUsbDeviceFS);
   if (st == run) {
+    // receive the command, set state
     if (Buf[0] == 'r') {
       switch (Buf[1]) {
         case 'i':
@@ -306,15 +311,21 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
       st = invalid;
       return (USBD_OK);
     }
-    if (sscanf((char *)Buf + 2, "%lx", &limit_address) != 1) {
-      st = invalid;
-      return (USBD_OK);
-    }
-    if (st == read_i2c || st == write_i2c) {
-      if (sscanf((char *)Buf + 2, "%*lx %hx", &i2c_address) != 1) {
+    // receive optional i2c address and limit address
+    uint8_t cursor = 3;                                                                     // 3 = 2 for the command, 1 for a separator
+    *Len -= cursor;
+    if (st == write_i2c || st == read_i2c) {
+      cursor += homegrown_scanf(Buf + cursor, Len, &i2c_address, ' ') + 1;  // + 1 for the delimiter
+      if (i2c_address == 0) {
         st = invalid;
         return (USBD_OK);
       }
+      *Len -= cursor;
+    }
+    homegrown_scanf(Buf + cursor, Len, &limit_address, '\n');
+    if (limit_address == 0) {
+      st = invalid;
+      return (USBD_OK);
     }
   }
   return (USBD_OK);
