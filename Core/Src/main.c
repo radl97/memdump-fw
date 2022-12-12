@@ -65,6 +65,33 @@ extern uint8_t CDC_Transmit_FS(uint8_t *Buf, uint16_t Len);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+/* -----------------------------------------------------------------------------
+ * convert a hex to ascii string
+ * input is a byte array (binary), output is a character array (str)
+ * len is the number of bytes to convert, str needs to be at least 2x as big
+ * -------------------------------------------------------------------------- */
+void hex_to_ascii (const uint8_t *binary, char *str, uint16_t len) {
+  for (uint16_t i = 0; i < len; ++i) {
+    uint8_t low = binary [i] & 0x0f;
+    uint8_t high = binary [i] >> 4;
+    str [2 * i] = (low > 0x9) ? low + '0' : low - 0xA + 'A';
+    str [2 * i + 1] = (high > 0x9) ? high + '0' : high - 0xA + 'A';
+  }
+}
+
+void i2c_dump(uint16_t dev_address, uint16_t capacity) {
+  const uint16_t bsize = 512;
+  char tx_buff [bsize * 2];
+  uint8_t read_buff [bsize];
+  for (uint16_t i = 0; i < capacity; i += bsize) {
+    HAL_I2C_Mem_Read(&hi2c1, dev_address, i, capacity, read_buff, bsize, 1000);
+    hex_to_ascii(read_buff, tx_buff, bsize);
+    CDC_Transmit_FS((uint8_t *) tx_buff, bsize * 2);
+  }
+}
+
+// todo spi, d28, d32 read & write, i2c write
+
 /* USER CODE END 0 */
 
 /**
@@ -110,6 +137,7 @@ int main(void)
 
     switch (st) {
       case read_i2c:
+        i2c_dump(i2c_address, limit_address);
         st = run;
         break;
       case read_spi:

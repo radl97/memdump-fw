@@ -60,6 +60,16 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 
+void i2c_dump(uint16_t dev_address, uint16_t capacity);
+void spi_dump(uint16_t capacity);
+void d28_dump(uint16_t capacity);
+void d32_dump(uint16_t capacity);
+
+void i2c_write(uint16_t dev_address, uint16_t capacity);
+void spi_write(uint16_t capacity);
+void d28_write(uint16_t capacity);
+void d32_write(uint16_t capacity);
+
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
