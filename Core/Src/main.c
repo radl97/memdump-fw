@@ -127,14 +127,14 @@ int main(void)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
 
-  uint8_t txbuff [1024] = {0};
+  char error_msg[] = "Invalid command!\n";
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
-
+    HAL_Delay(100);
     switch (st) {
       case read_i2c:
         i2c_dump(i2c_address, limit_address);
@@ -161,7 +161,10 @@ int main(void)
       case write_d32:
         st = run;
         break;
-      default:;
+      case invalid:
+        CDC_Transmit_FS( (uint8_t *) error_msg, strlen(error_msg));
+      default:
+        continue;
     }
     /* USER CODE END WHILE */
 
