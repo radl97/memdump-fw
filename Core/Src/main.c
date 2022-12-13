@@ -48,8 +48,8 @@ SPI_HandleTypeDef hspi1;
 /* USER CODE BEGIN PV */
 
 state st = run;
-uint32_t i2c_address = 0;
-uint32_t limit_address = 0;
+uint8_t cmd_buf [BUFSIZ] = {0};
+uint8_t cmd_pos = 0;
 
 /* USER CODE END PV */
 
@@ -93,7 +93,7 @@ extern uint8_t CDC_Transmit_FS(uint8_t *Buf, uint16_t Len);
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  * -------------------------------------------------------------------------- */
-uint8_t hex_nibble(char val) {
+uint8_t hex_nibble(const char val) {
   if ('0' <= val && val <= '9')
     return val - '0';
   if ('a' <= val && val <= 'f')
@@ -108,16 +108,17 @@ uint8_t hex_nibble(char val) {
  * Result is stored to dest
  * Return value is the number of characters processed or 0 in case of a conversion failure
  * ----------------------------------------------------------------------------------------- */
-uint8_t homegrown_scanf (uint8_t *Buf, const uint32_t *Len, uint32_t *dest, const char delim) {
+uint8_t homegrown_scanf (uint8_t *Buf, uint8_t Len, uint32_t *dest, const char delim) {
   uint8_t cursor = 0;
-  for (*dest = 0; Buf[cursor] != delim || cursor < *Len; cursor++) {
+  for (*dest = 0; Buf[cursor] != delim && cursor < Len; cursor++) {
     uint8_t nibble = hex_nibble(Buf[cursor]);
     if (nibble == 0xFF) {
-      return(0);
+      *dest = 0;
+      return(cursor + 1);
     }
     *dest = *dest * 16 + nibble;
   }
-  return (cursor);
+  return (cursor + 1);
 }
 /* --------------------------------------------------------------------------
  * convert a hex to ascii string
@@ -128,19 +129,26 @@ void hex_to_ascii (const uint8_t *binary, char *str, uint16_t len) {
   for (uint16_t i = 0; i < len; ++i) {
     uint8_t low = binary [i] & 0x0f;
     uint8_t high = binary [i] >> 4;
-    str [2 * i] = (low > 0x9) ? low + '0' : low - 0xA + 'A';
-    str [2 * i + 1] = (high > 0x9) ? high + '0' : high - 0xA + 'A';
+    str [2 * i] = (low <= 0x9) ? low + '0' : low - 0xA + 'A';
+    str [2 * i + 1] = (high <= 0x9) ? high + '0' : high - 0xA + 'A';
   }
 }
 
 void i2c_dump(uint16_t dev_address, uint16_t capacity) {
-  const uint16_t bsize = 512;
-  char tx_buff [bsize * 2];
-  uint8_t read_buff [bsize];
-  for (uint16_t i = 0; i < capacity; i += bsize) {
-    HAL_I2C_Mem_Read(&hi2c1, dev_address, i, capacity, read_buff, bsize, 1000);
-    hex_to_ascii(read_buff, tx_buff, bsize);
-    CDC_Transmit_FS((uint8_t *) tx_buff, bsize * 2);
+  char tx_buff [BUFSIZ] = {0};
+  uint8_t read_buff [BUFSIZ / 2] = {0};
+  for (uint16_t i = 0; i < capacity; i += BUFSIZ / 2) {
+    if (HAL_I2C_Mem_Read(&hi2c1, dev_address << 1, i, capacity, read_buff, capacity, capacity / 50000) != HAL_OK) {
+      CDC_Transmit_FS((uint8_t *) "No memory on address\n\r", 22);
+      __HAL_RCC_I2C1_FORCE_RESET();
+      HAL_Delay(100);
+      __HAL_RCC_I2C1_RELEASE_RESET();
+    }
+    else {
+      hex_to_ascii(read_buff, tx_buff, capacity);
+      CDC_Transmit_FS((uint8_t *) tx_buff, capacity * 2);
+      CDC_Transmit_FS((uint8_t *) "\n\r", 2);
+    }
   }
 }
 
@@ -181,42 +189,119 @@ int main(void)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
 
-  char error_msg[] = "Invalid command!\n";
-
+  char error_msg[] = "Invalid command!\n\r";
+  uint32_t i2c_address = 0;
+  uint32_t limit_address = 0;
+  __HAL_RCC_I2C1_FORCE_RESET();
+  HAL_Delay(100);
+  __HAL_RCC_I2C1_RELEASE_RESET();
+  HAL_GPIO_WritePin(ARST_GPIO_Port, ARST_Pin, 0);
+  HAL_Delay(100);
+  HAL_GPIO_WritePin(ARST_GPIO_Port, ARST_Pin, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
     HAL_Delay(100);
+    //if received \r start decoding state
+    if (cmd_buf[cmd_pos - 1] == '\r') {
+      // receive the command, set state
+      if (cmd_buf[0] == 'r') {
+        switch (cmd_buf[1]) {
+          case 'i':
+            st = read_i2c;
+            break;
+          case 's':
+            st = read_spi;
+            break;
+          case '2':
+            st = read_d28;
+            break;
+          case '3':
+            st = read_d32;
+            break;
+          default:
+            st = invalid;
+        }
+      }
+      else if (cmd_buf[0] == 'w') {
+        switch (cmd_buf[1]) {
+          case 'i':
+            st = write_i2c;
+            break;
+          case 's':
+            st = write_spi;
+            break;
+          case '2':
+            st = write_d28;
+            break;
+          case '3':
+            st = write_d32;
+            break;
+          default:
+            st = invalid;
+        }
+      }
+      else {
+        st = invalid;
+      }
+      // receive optional i2c address and limit address
+      uint8_t cursor = 3;                                                                     // 3 = 2 for the command, 1 for a separator
+      cmd_pos -= cursor - 1;
+      if (st == write_i2c || st == read_i2c) {
+        cursor += (homegrown_scanf(cmd_buf + cursor, cmd_pos, &i2c_address, ' '));
+        if (i2c_address == 0) {
+          st = invalid;
+        }
+        cmd_pos -= cursor - 1;
+      }
+      homegrown_scanf(cmd_buf + cursor, cmd_pos, &limit_address, '\r');
+      if (limit_address == 0) {
+        st = invalid;
+      }
+      //reset cmd_buf and cmd_pos
+      memset(cmd_buf, 0, BUFSIZ);
+      cmd_pos = 0;
+    }
     switch (st) {
       case read_i2c:
         i2c_dump(i2c_address, limit_address);
+        i2c_address = 0;
+        limit_address = 0;
         st = run;
         break;
       case read_spi:
+        limit_address = 0;
         st = run;
         break;
       case read_d28:
+        limit_address = 0;
         st = run;
         break;
       case read_d32:
+        limit_address = 0;
         st = run;
         break;
       case write_i2c:
+        limit_address = 0;
         st = run;
         break;
       case write_spi:
+        limit_address = 0;
         st = run;
         break;
       case write_d28:
+        limit_address = 0;
         st = run;
         break;
       case write_d32:
+        limit_address = 0;
         st = run;
         break;
       case invalid:
         CDC_Transmit_FS( (uint8_t *) error_msg, strlen(error_msg));
+        st = run;
       default:
         continue;
     }

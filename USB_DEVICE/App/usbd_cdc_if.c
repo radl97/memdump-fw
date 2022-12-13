@@ -31,9 +31,11 @@
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
+
 extern state st;
-extern uint32_t i2c_address;
-extern uint32_t limit_address;
+extern uint8_t cmd_buf [BUFSIZ];
+extern uint8_t cmd_pos;
+
 /* USER CODE END PV */
 
 /** @addtogroup STM32_USB_OTG_DEVICE_LIBRARY
@@ -111,10 +113,6 @@ uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 extern USBD_HandleTypeDef hUsbDeviceFS;
 
 /* USER CODE BEGIN EXPORTED_VARIABLES */
-
-extern uint8_t hex_nibble(char val);
-extern uint8_t homegrown_scanf (uint8_t *Buf, const uint32_t *Len, uint32_t *dest, char delim);
-
 
 /* USER CODE END EXPORTED_VARIABLES */
 
@@ -267,66 +265,10 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
   /* USER CODE BEGIN 6 */
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
   USBD_CDC_ReceivePacket(&hUsbDeviceFS);
+  CDC_Transmit_FS(Buf, *Len);
   if (st == run) {
-    // receive the command, set state
-    if (Buf[0] == 'r') {
-      switch (Buf[1]) {
-        case 'i':
-          st = read_i2c;
-          break;
-        case 's':
-          st = read_spi;
-          break;
-        case '2':
-          st = read_d28;
-          break;
-        case '3':
-          st = read_d32;
-          break;
-        default:
-          st = invalid;
-          return (USBD_OK);
-      }
-    }
-    else if (Buf[0] == 'w') {
-      switch (Buf[1]) {
-        case 'i':
-          st = write_i2c;
-          break;
-        case 's':
-          st = write_spi;
-          break;
-        case '2':
-          st = write_d28;
-          break;
-        case '3':
-          st = write_d32;
-          break;
-        default:
-          st = invalid;
-          return (USBD_OK);
-      }
-    }
-    else {
-      st = invalid;
-      return (USBD_OK);
-    }
-    // receive optional i2c address and limit address
-    uint8_t cursor = 3;                                                                     // 3 = 2 for the command, 1 for a separator
-    *Len -= cursor;
-    if (st == write_i2c || st == read_i2c) {
-      cursor += homegrown_scanf(Buf + cursor, Len, &i2c_address, ' ') + 1;  // + 1 for the delimiter
-      if (i2c_address == 0) {
-        st = invalid;
-        return (USBD_OK);
-      }
-      *Len -= cursor;
-    }
-    homegrown_scanf(Buf + cursor, Len, &limit_address, '\n');
-    if (limit_address == 0) {
-      st = invalid;
-      return (USBD_OK);
-    }
+    memcpy(cmd_buf + cmd_pos, Buf, (*Len > BUFSIZ - cmd_pos) ? BUFSIZ - cmd_pos : *Len );
+    cmd_pos += (*Len > BUFSIZ - cmd_pos) ? BUFSIZ - cmd_pos : *Len;
   }
   return (USBD_OK);
   /* USER CODE END 6 */
