@@ -138,15 +138,18 @@ void i2c_dump(uint16_t dev_address, uint16_t capacity) {
   char tx_buff [BUFSIZ] = {0};
   uint8_t read_buff [BUFSIZ / 2] = {0};
   for (uint16_t i = 0; i < capacity; i += BUFSIZ / 2) {
-    if (HAL_I2C_Mem_Read(&hi2c1, dev_address << 1, i, capacity, read_buff, capacity, capacity / 50000) != HAL_OK) {
+    uint8_t reason;
+    if ((reason = HAL_I2C_Mem_Read(&hi2c1, dev_address << 1, i, capacity, read_buff, BUFSIZ/2, 1000)) != HAL_OK) {
+
       CDC_Transmit_FS((uint8_t *) "No memory on address\n\r", 22);
+
       __HAL_RCC_I2C1_FORCE_RESET();
       HAL_Delay(100);
       __HAL_RCC_I2C1_RELEASE_RESET();
     }
     else {
-      hex_to_ascii(read_buff, tx_buff, capacity);
-      CDC_Transmit_FS((uint8_t *) tx_buff, capacity * 2);
+      hex_to_ascii(read_buff, tx_buff, BUFSIZ/2);
+      CDC_Transmit_FS((uint8_t *) tx_buff, BUFSIZ);
       CDC_Transmit_FS((uint8_t *) "\n\r", 2);
     }
   }
