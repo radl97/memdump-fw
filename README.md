@@ -10,7 +10,7 @@ $ make
 ```
 
 ```
-memdump-fw$ sudo openocd -f memdump-stlink.cfg -c 'program memdump.elf'
+cmake-build-debug$ sudo openocd -f ../memdump-stlink.cfg -c 'program memdump.elf'
 ```
 
 Two remarks:
@@ -46,3 +46,7 @@ cmake-build-debug$ gdb-multiarch --nx
 ```
 
 `\o/`
+
+### Testing I2C
+
+`ri 50 400`
