@@ -134,6 +134,13 @@ void hex_to_ascii (const uint8_t *binary, char *str, uint16_t len) {
   }
 }
 
+char *hal_reason[] = {
+  "OK     \n\r", // HAL_OK == 0
+  "ERROR  \n\r", // HAL_ERROR == 1
+  "BUSY   \n\r", // HAL_BUSY == 2
+  "TIMEOUT\n\r", // HAL_TIMEOUT == 3
+};
+
 void i2c_dump(uint16_t dev_address, uint16_t capacity) {
   char tx_buff [BUFSIZ] = {0};
   uint8_t read_buff [BUFSIZ / 2] = {0};
@@ -142,6 +149,9 @@ void i2c_dump(uint16_t dev_address, uint16_t capacity) {
     if ((reason = HAL_I2C_Mem_Read(&hi2c1, dev_address << 1, i, capacity, read_buff, BUFSIZ/2, 1000)) != HAL_OK) {
 
       CDC_Transmit_FS((uint8_t *) "No memory on address\n\r", 22);
+      HAL_Delay(100);
+      CDC_Transmit_FS((uint8_t *) hal_reason[reason], 9); // Got ERROR, and hi2c1.ErrorCode == HAL_I2C_ERROR_TIMEOUT
+      HAL_Delay(100);
 
       __HAL_RCC_I2C1_FORCE_RESET();
       HAL_Delay(100);
