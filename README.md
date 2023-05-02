@@ -33,7 +33,7 @@ Thus, both the programmer board and the target board was plugged into the comput
 We will need `gdb-multiarch`.
 
 ```
-memdump-fw$ openocd -c memdump-stlink.cfg
+memdump-fw$ openocd -f memdump-stlink.cfg
 ```
 
 (or the same command with `memdump-stlink-focal.cfg`) starts the fancy gdbserver on `localhost:3333`.
