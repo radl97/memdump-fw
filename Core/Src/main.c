@@ -142,11 +142,12 @@ char *hal_reason[] = {
 };
 
 void i2c_dump(uint16_t dev_address, uint16_t capacity) {
+
   char tx_buff [BUFSIZ] = {0};
   uint8_t read_buff [BUFSIZ / 2] = {0};
   for (uint16_t i = 0; i < capacity; i += BUFSIZ / 2) {
     uint8_t reason;
-    if ((reason = HAL_I2C_Mem_Read(&hi2c1, dev_address << 1, i, capacity, read_buff, BUFSIZ/2, 1000)) != HAL_OK) {
+    if ((reason = HAL_I2C_Mem_Read(&hi2c1, dev_address << 1, i, 8, read_buff, BUFSIZ/2, 500)) != HAL_OK) {
 
       CDC_Transmit_FS((uint8_t *) "No memory on address\n\r", 22);
       HAL_Delay(100);
@@ -225,8 +226,11 @@ void i2c_errata() {
   // 8. Configure the SCL I/O as General Purpose Output Open-Drain, High level (Write 1 to GPIOx_ODR).
   ATOMIC_MODIFY_REG(GPIOB->ODR, 0, PIN_SCL);
   // 9. Check SCL High level in GPIOx_IDR.
-  HAL_Delay(100);
-
+  HAL_Delay(1000);
+  READ_REG(GPIOB->ODR);
+  HAL_Delay(1000);
+  READ_REG(GPIOB->IDR);
+  HAL_Delay(1000);
   if (READ_BIT(GPIOB->IDR, PIN_SCL) != PIN_SCL) {
     err = 1;
     reason = "Error in step 9\n\r";
@@ -235,7 +239,7 @@ void i2c_errata() {
   // 10. Configure the SDA I/O as General Purpose Output Open-Drain , High level (Write 1 to GPIOx_ODR).
   ATOMIC_MODIFY_REG(GPIOB->ODR, 0, PIN_SDA);
   // 11. Check SDA High level in GPIOx_IDR.
-  HAL_Delay(100);
+  HAL_Delay(1000);
 
   if (READ_BIT(GPIOB->IDR, PIN_SDA) != PIN_SDA) {
     err = 1;
@@ -243,7 +247,20 @@ void i2c_errata() {
     goto label_err;
   }
   // 12. Configure the SCL and SDA I/Os as Alternate function Open-Drain.
-  // TODO
+
+  {
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    //  /*Configure GPIO pin Output Level */
+    //HAL_GPIO_WritePin(GPIOB, D6_Pin, GPIO_PIN_RESET);
+
+    GPIO_InitStruct.Pin = D6_Pin|D7_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
+    GPIO_InitStruct.Pull = GPIO_NOPULL; // GPIO_PULLUP vagy GPIO_PULLDOWN
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    HAL_Delay(100); // TODO wait until IDR has right value
+  }
+
   HAL_Delay(100);
   // 13. Set SWRST bit in I2Cx_CR1 register.
   SET_BIT(I2C1->CR1, I2C_CR1_SWRST);
@@ -509,14 +526,14 @@ static void MX_I2C1_Init(void)
 
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 100000;
+  hi2c1.Init.ClockSpeed = 1000;
   hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
   hi2c1.Init.OwnAddress1 = 0;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
   hi2c1.Init.OwnAddress2 = 0;
   hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_ENABLE;
   if (HAL_I2C_Init(&hi2c1) != HAL_OK)
   {
     Error_Handler();
